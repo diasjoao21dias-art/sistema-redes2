@@ -58,9 +58,10 @@ engine = create_engine(
 Base.metadata.create_all(engine)
 SessionLocal = sessionmaker(bind=engine)
 
-status_cache = {}
+status_cache = {}  # Agora usando hostname como chave
 machines_cache = []  # Cache das máquinas carregadas
 last_machines_load = 0  # Timestamp da última carga
+dns_cache = {}  # Cache de resolução DNS: {hostname: {ip, resolved_at, ok, error}}
 monitoring_stats = {
     "last_scan_duration": 0,
     "successful_checks": 0,
@@ -73,6 +74,50 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ----------------- Funções utilitárias -----------------
+
+def resolve_hostname(hostname, timeout=3):
+    """Resolve hostname para IP com cache TTL de 5 minutos"""
+    global dns_cache
+    now = time.time()
+    
+    # Verifica cache
+    if hostname in dns_cache:
+        cache_entry = dns_cache[hostname]
+        # Cache válido por 5 minutos
+        if (now - cache_entry["resolved_at"]) < 300:
+            if cache_entry["ok"]:
+                return cache_entry["ip"], None
+            else:
+                return None, cache_entry["error"]
+    
+    try:
+        # Tenta resolver o hostname
+        socket.setdefaulttimeout(timeout)
+        ip = socket.gethostbyname(hostname)
+        socket.setdefaulttimeout(None)
+        
+        # Armazena no cache
+        dns_cache[hostname] = {
+            "ip": ip,
+            "resolved_at": now,
+            "ok": True,
+            "error": None
+        }
+        
+        return ip, None
+        
+    except (socket.gaierror, socket.timeout, Exception) as e:
+        error_msg = f"DNS resolution failed: {str(e)}"
+        
+        # Armazena erro no cache
+        dns_cache[hostname] = {
+            "ip": None,
+            "resolved_at": now,
+            "ok": False,
+            "error": error_msg
+        }
+        
+        return None, error_msg
 
 def agora_brasilia():
     """Retorna a data/hora atual no fuso horário de Brasília"""
@@ -90,13 +135,13 @@ def formatar_data_br(dt):
         dt = dt.astimezone(BRASILIA_TZ)
     return dt.strftime("%d/%m/%Y %H:%M:%S")
 
-def ping_icmp(ip: str, retries=MAX_RETRIES):
-    """Ping ICMP otimizado com retry automático"""
+def ping_icmp_target(target: str, retries=MAX_RETRIES):
+    """Ping ICMP otimizado que aceita hostname ou IP com retry automático"""
     is_windows = platform.system().lower() == "windows"
     
     for attempt in range(retries):
-        cmd = ["ping", "-n", "1", "-w", str(PING_TIMEOUT_MS), ip] if is_windows else \
-              ["ping", "-c", "1", "-W", str(int(PING_TIMEOUT_MS/1000) or 1), ip]
+        cmd = ["ping", "-n", "1", "-w", str(PING_TIMEOUT_MS), target] if is_windows else \
+              ["ping", "-c", "1", "-W", str(int(PING_TIMEOUT_MS/1000) or 1), target]
         
         t0 = time.perf_counter()
         try:
@@ -105,7 +150,7 @@ def ping_icmp(ip: str, retries=MAX_RETRIES):
                 capture_output=True, 
                 text=True, 
                 timeout=(PING_TIMEOUT_MS/1000 + 1),
-                creationflags=subprocess.CREATE_NO_WINDOW if is_windows else 0
+                creationflags=0x08000000 if is_windows else 0  # CREATE_NO_WINDOW flag for Windows
             )
             if out.returncode == 0:
                 latency = (time.perf_counter() - t0) * 1000.0
@@ -118,7 +163,10 @@ def ping_icmp(ip: str, retries=MAX_RETRIES):
     return False, None
 
 def tcp_ping(ip: str, port: int, timeout=0.3) -> bool:
-    """TCP ping otimizado com timeout menor"""
+    """TCP ping otimizado com timeout menor - sempre usa IP resolvido"""
+    if not ip:  # Se não tem IP resolvido, falha
+        return False
+        
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(timeout)
@@ -129,68 +177,80 @@ def tcp_ping(ip: str, port: int, timeout=0.3) -> bool:
         return False
 
 def checar_um_host(host: dict):
-    """Verifica status de um host com otimizações de performance"""
-    ip = host["ip"]
-    name = host["name"]
+    """Verifica status de um host usando hostname como identidade principal"""
+    hostname = host["name"]
+    ip_hint = host.get("ip", None)  # IP opcional do CSV
     
-    # Verifica se IP é válido
-    if not ip or ip == "?" or "/" in ip:
+    if not hostname:
         return None
     
     try:
-        # Primeiro tenta ICMP ping
-        online, latency = ping_icmp(ip)
+        # Resolve o hostname para IP
+        resolved_ip, dns_error = resolve_hostname(hostname)
         
-        # Se ICMP falhou, tenta TCP nas portas comuns
-        if not online:
-            for port in PORTAS_TCP_TESTE:
-                if tcp_ping(ip, port):
-                    online = True
-                    latency = None  # TCP ping não mede latência precisa
-                    break
+        online = False
+        latency = None
+        reason = None
+        
+        if resolved_ip:
+            # Primeiro tenta ICMP ping usando o hostname
+            online, latency = ping_icmp_target(hostname)
+            
+            # Se ICMP falhou, tenta TCP nas portas comuns usando o IP resolvido
+            if not online:
+                for port in PORTAS_TCP_TESTE:
+                    if tcp_ping(resolved_ip, port):
+                        online = True
+                        latency = None  # TCP ping não mede latência precisa
+                        break
+        else:
+            # Falha de DNS
+            reason = "DNS_FAIL"
+            logger.warning(f"Falha de resolução DNS para {hostname}: {dns_error}")
 
         now = agora_brasilia()
-        existing = status_cache.get(ip, {})
+        existing = status_cache.get(hostname, {})
         old_status = existing.get("status")
         new_status = "Online" if online else "Offline"
 
         data = {
-            "name": name,
-            "ip": ip,
+            "name": hostname,
+            "ip": resolved_ip,  # IP atual resolvido ou None
             "status": new_status,
             "last_checked": now,
-            "latency_ms": latency
+            "latency_ms": latency,
+            "reason": reason
         }
         
-        # Atualiza cache de forma thread-safe
-        status_cache[ip] = data
+        # Atualiza cache usando hostname como chave
+        status_cache[hostname] = data
 
         # Se mudou de status, grava no banco
         if old_status and old_status != new_status:
             try:
                 with SessionLocal() as db:
                     db.add(HostHistory(
-                        name=name, 
-                        ip=ip, 
+                        name=hostname, 
+                        ip=resolved_ip or ip_hint or "unknown", 
                         status=new_status, 
                         latency_ms=latency, 
                         timestamp=now
                     ))
                     db.commit()
             except Exception as e:
-                logger.error(f"Erro ao salvar histórico para {ip}: {e}")
+                logger.error(f"Erro ao salvar histórico para {hostname}: {e}")
         
         # Atualiza estatísticas
         monitoring_stats["successful_checks"] += 1
         return data
         
     except Exception as e:
-        logger.error(f"Erro ao verificar host {ip}: {e}")
+        logger.error(f"Erro ao verificar host {hostname}: {e}")
         monitoring_stats["failed_checks"] += 1
         return None
 
 def carregar_maquinas():
-    """Carrega máquinas do CSV com cache inteligente"""
+    """Carrega máquinas do CSV com cache inteligente - agora aceita apenas hostname"""
     global machines_cache, last_machines_load
     
     # Verifica se precisa recarregar (cache de 5 minutos)
@@ -205,15 +265,19 @@ def carregar_maquinas():
                 reader = csv.reader(f)
                 next(reader, None)  # Pula o cabeçalho
                 for row_num, row in enumerate(reader, 2):  # Começa do 2 por causa do header
-                    if len(row) >= 2:
+                    if len(row) >= 1:  # Agora só precisa do nome
                         name = row[0].strip()
-                        ip = row[1].strip()
+                        ip_hint = row[1].strip() if len(row) >= 2 else None
                         
-                        # Filtra IPs inválidos
-                        if name and ip and ip != "?" and "/" not in ip:
-                            maquinas.append({"name": name, "ip": ip})
-                        elif ip and ip != "?":
-                            logger.warning(f"IP inválido na linha {row_num}: {ip}")
+                        # Só precisa do nome válido
+                        if name:
+                            entry = {"name": name}
+                            # IP é apenas uma dica opcional
+                            if ip_hint and ip_hint != "?" and "/" not in ip_hint:
+                                entry["ip"] = ip_hint
+                            maquinas.append(entry)
+                        else:
+                            logger.warning(f"Nome vazio na linha {row_num}")
             
             logger.info(f"Carregadas {len(maquinas)} máquinas do arquivo {MACHINES_FILE}")
             
@@ -267,7 +331,7 @@ def worker_loop():
             
             # Calcula tempo da varredura
             scan_duration = time.perf_counter() - start_time
-            monitoring_stats["last_scan_duration"] = round(scan_duration, 2)
+            monitoring_stats["last_scan_duration"] = round(scan_duration, 2) if scan_duration is not None else 0
             monitoring_stats["total_scans"] += 1
             
             logger.info(
@@ -304,7 +368,8 @@ def status():
     return jsonify(resp)
 
 @app.route("/history/<ip>")
-def history(ip):
+def history_by_ip(ip):
+    """Rota legada para histórico por IP"""
     with SessionLocal() as db:
         rows = db.query(HostHistory).filter(HostHistory.ip == ip).order_by(HostHistory.timestamp.desc()).limit(50).all()
         data = [
@@ -312,6 +377,22 @@ def history(ip):
                 "status": r.status,
                 "latency_ms": r.latency_ms,
                 "time": formatar_data_br(r.timestamp)
+            }
+            for r in rows
+        ]
+    return jsonify(data)
+
+@app.route("/history/name/<hostname>")
+def history_by_name(hostname):
+    """Nova rota para histórico por hostname"""
+    with SessionLocal() as db:
+        rows = db.query(HostHistory).filter(HostHistory.name == hostname).order_by(HostHistory.timestamp.desc()).limit(50).all()
+        data = [
+            {
+                "status": r.status,
+                "latency_ms": r.latency_ms,
+                "time": formatar_data_br(r.timestamp),
+                "ip": r.ip  # Mostra qual IP estava sendo usado na época
             }
             for r in rows
         ]
@@ -377,7 +458,7 @@ def export_excel():
     header_df = pd.DataFrame(header_data)
     
     # Write to Excel with multiple sheets/sections
-    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+    with pd.ExcelWriter(buffer, engine='openpyxl', mode='w') as writer:
         # Write header
         header_df.to_excel(writer, sheet_name='Status da Rede', index=False, header=False, startrow=0)
         
@@ -496,11 +577,11 @@ def export_pdf():
     
     for item in items:
         table_data.append([
-            item["name"],
-            item["ip"],
-            item["status"],
+            str(item["name"] or ""),
+            str(item["ip"] or ""),
+            str(item["status"] or ""),
             str(item["latency_ms"]) if item["latency_ms"] else "N/A",
-            formatar_data_br(item["last_checked"]) if item["last_checked"] else "Nunca"
+            str(formatar_data_br(item["last_checked"])) if item["last_checked"] else "Nunca"
         ])
     
     # Create modern table
@@ -620,15 +701,17 @@ def search():
 # ----------------- Inicialização -----------------
 
 def inicializar_cache():
-    """Inicializa o cache com todas as máquinas conhecidas"""
+    """Inicializa o cache com todas as máquinas conhecidas - usando hostname como chave"""
     logger.info("Inicializando cache de máquinas...")
     for m in carregar_maquinas():
-        status_cache[m["ip"]] = {
-            "name": m["name"],
-            "ip": m["ip"],
+        hostname = m["name"]
+        status_cache[hostname] = {
+            "name": hostname,
+            "ip": None,  # Será resolvido dinamicamente
             "status": "Desconhecido",
             "last_checked": None,
-            "latency_ms": None
+            "latency_ms": None,
+            "reason": None
         }
     logger.info(f"Cache inicializado com {len(status_cache)} máquinas")
 
