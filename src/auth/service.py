@@ -184,7 +184,8 @@ class AuthService:
                 password_hash=self._hash_password(password),
                 is_active=True,
                 is_superuser=True,
-                api_key=secrets.token_urlsafe(32)
+                api_key=secrets.token_urlsafe(32),
+                api_key_active=True  # Enable API key authentication
             )
             db.add(admin)
             db.flush()  # Get ID

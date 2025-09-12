@@ -117,9 +117,10 @@ def require_api_key(api_key: str = None) -> dict:
             detail="Invalid API key"
         )
     
-    roles = auth_service.get_user_roles(user.id)
+    # user is now a dict, not an object
+    roles = auth_service.get_user_roles(user['id'])
     return {
-        'id': user.id,
-        'username': user.username,
+        'id': user['id'],
+        'username': user['username'],
         'roles': roles
     }
