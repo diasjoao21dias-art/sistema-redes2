@@ -175,22 +175,29 @@ def tcp_ping(ip: str, port: int, timeout=0.3) -> bool:
         return False
 
 def checar_um_host(host: dict):
-    """Verifica status de um host usando hostname como identidade principal"""
+    """Verifica status de um host usando abordagem híbrida: hostname primeiro, IP como fallback"""
     hostname = host["name"]
-    ip_hint = host.get("ip", None)  # IP opcional do CSV
+    ip_fallback = host.get("ip", None)  # IP do CSV como backup
     
     if not hostname:
         return None
     
     try:
-        # Resolve o hostname para IP
+        # ETAPA 1: Tenta resolver hostname para IP
         resolved_ip, dns_error = resolve_hostname(hostname)
         
         online = False
         latency = None
         reason = None
+        target_ip = None  # IP que será usado para ping
+        method = None     # Método de resolução usado
         
         if resolved_ip:
+            # SUCESSO DNS: Usa IP resolvido automaticamente
+            target_ip = resolved_ip
+            method = "HOSTNAME"
+            logger.debug(f"DNS OK para {hostname} → {resolved_ip}")
+            
             # Primeiro tenta ICMP ping usando o hostname
             online, latency = ping_icmp_target(hostname)
             
@@ -201,31 +208,53 @@ def checar_um_host(host: dict):
                         online = True
                         latency = None  # TCP ping não mede latência precisa
                         break
+                        
+        elif ip_fallback:
+            # ETAPA 2: FALLBACK - Usa IP do CSV quando DNS falha
+            target_ip = ip_fallback
+            method = "IP_FALLBACK"
+            logger.info(f"DNS FAIL para {hostname}, usando IP fallback: {ip_fallback}")
+            reason = "DNS_FAIL_FALLBACK"
+            
+            # Tenta ICMP ping usando o IP direto
+            online, latency = ping_icmp_target(ip_fallback)
+            
+            # Se ICMP falhou, tenta TCP nas portas comuns
+            if not online:
+                for port in PORTAS_TCP_TESTE:
+                    if tcp_ping(ip_fallback, port):
+                        online = True
+                        latency = None
+                        break
         else:
-            # Falha de DNS
-            reason = "DNS_FAIL"
-            logger.warning(f"Falha de resolução DNS para {hostname}: {dns_error}")
+            # ETAPA 3: Falha total - sem DNS e sem IP backup
+            reason = "DNS_FAIL_NO_BACKUP"
+            logger.warning(f"FALHA TOTAL para {hostname}: sem DNS nem IP backup. Erro: {dns_error}")
 
         now = agora_brasilia()
         existing = status_cache.get(hostname, {})
         old_status = existing.get("status")
         new_status = "Online" if online else "Offline"
 
+        # IP final que será mostrado na interface
+        final_ip = resolved_ip if resolved_ip else target_ip
+        
         data = {
             "name": hostname,
-            "ip": resolved_ip,  # IP atual resolvido ou None
+            "ip": final_ip,  # IP atual (resolvido ou fallback)
             "status": new_status,
             "last_checked": now,
             "latency_ms": latency,
             "reason": reason,
+            "method": method,     # Como foi resolvido (HOSTNAME ou IP_FALLBACK)
             "ip_changed": False  # Flag para indicar mudança de IP
         }
         
         # Detecta mudança de IP e atualiza automaticamente
-        if existing and existing.get("ip") and resolved_ip:
+        if existing and existing.get("ip") and final_ip:
             old_ip = existing.get("ip")
-            if old_ip != resolved_ip:
-                logger.info(f"IP ALTERADO para {hostname}: {old_ip} → {resolved_ip}")
+            if old_ip != final_ip:
+                logger.info(f"IP ALTERADO para {hostname}: {old_ip} → {final_ip} (método: {method})")
                 data["ip_changed"] = True
                 
                 # Grava mudança no histórico como evento especial
@@ -233,8 +262,8 @@ def checar_um_host(host: dict):
                     with SessionLocal() as db:
                         db.add(HostHistory(
                             name=hostname, 
-                            ip=resolved_ip, 
-                            status=f"IP_CHANGED: {old_ip} → {resolved_ip}", 
+                            ip=final_ip, 
+                            status=f"IP_CHANGED: {old_ip} → {final_ip} via {method}", 
                             latency_ms=None, 
                             timestamp=now
                         ))
@@ -252,7 +281,7 @@ def checar_um_host(host: dict):
                 with SessionLocal() as db:
                     db.add(HostHistory(
                         name=hostname, 
-                        ip=resolved_ip or ip_hint or "unknown", 
+                        ip=final_ip or "unknown", 
                         status=new_status, 
                         latency_ms=latency, 
                         timestamp=now
@@ -385,7 +414,8 @@ def status():
             "status": it["status"],
             "time_last_checked": formatar_data_br(it["last_checked"]) if it["last_checked"] else None,
             "latency_ms": it["latency_ms"],
-            "reason": it.get("reason"),  # Motivo se offline (ex: DNS_FAIL)
+            "reason": it.get("reason"),  # Motivo se offline 
+            "method": it.get("method"),   # Método de resolução (HOSTNAME/IP_FALLBACK)
             "ip_changed": it.get("ip_changed", False)  # Flag de mudança de IP
         })
     return jsonify(resp)

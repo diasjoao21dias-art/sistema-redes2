@@ -333,7 +333,7 @@
     <section class="bg-white dark:bg-slate-800 rounded-2xl shadow-md overflow-hidden border border-gray-200 dark:border-slate-700">
       <div class="px-6 py-4 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-700/50">
         <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Máquinas da Rede</h3>
-        <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Monitoramento por hostname com resolução automática de IP atual</p>
+        <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Monitoramento híbrido: hostname primeiro, IP backup quando necessário</p>
       </div>
       
       <div class="overflow-x-auto">
@@ -529,8 +529,16 @@
                   '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"><i class="fas fa-sync-alt mr-1"></i>IP Alterado</span>' : 
                   ''
                 }
-                ${maquina.reason === 'DNS_FAIL' ? 
-                  '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"><i class="fas fa-exclamation-triangle mr-1"></i>Falha DNS</span>' : 
+                ${maquina.reason === 'DNS_FAIL_FALLBACK' ? 
+                  '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200"><i class="fas fa-shield-alt mr-1"></i>IP Backup</span>' : 
+                  ''
+                }
+                ${maquina.reason === 'DNS_FAIL_NO_BACKUP' ? 
+                  '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"><i class="fas fa-exclamation-triangle mr-1"></i>Falha Total</span>' : 
+                  ''
+                }
+                ${maquina.method === 'HOSTNAME' ? 
+                  '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"><i class="fas fa-check mr-1"></i>DNS OK</span>' : 
                   ''
                 }
               </div>
