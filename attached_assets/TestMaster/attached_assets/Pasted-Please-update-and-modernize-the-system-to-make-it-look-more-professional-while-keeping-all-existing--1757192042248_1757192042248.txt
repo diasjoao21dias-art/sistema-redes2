@@ -1,0 +1,63 @@
+Please update and modernize the system to make it look more professional while keeping all existing functionality.  
+
+Requirements:
+1. Keep all current features working:
+   - Machines must load automatically from machines.csv
+   - Real-time monitoring of online/offline status
+   - Display "Last Time Online" for offline machines
+   - Summary counters (total, online, offline, average latency)
+   - Export to PDF instead of CSV
+
+2. Improve and modernize the dashboard design:
+   - You have full freedom to decide the best modern and professional design (colors, layout, typography, icons, etc.).
+   - The design must look clean, polished, and professional.
+   - Ensure the layout is responsive for different screen sizes.
+   - Add subtle animations for status updates (when a machine goes online or offline).
+   - Use clear visual indicators for machine statuses (Online, Offline, Unknown).
+   - Add an option for users to switch manually between **light mode and dark mode**.
+   - Display a header with the system title **"Sistemas Olivium"** at the top of the dashboard. 
+     - The header must stay fixed (sticky) at the top when scrolling.
+     - If possible, allow a logo to be added next to the title in the future.
+   - Add a professional footer (rodapé) at the bottom of the dashboard with:
+     - The current year dynamically.
+     - The text: "© <year> Sistemas Olivium - Todos os direitos reservados".
+     - The footer should adapt to both light and dark themes.
+
+3. Keep the entire system in Portuguese (pt-BR) and follow Brasília timezone.
+   - Dates and times in Brazilian format (DD/MM/YYYY HH:mm:ss).
+
+4. PDF Export:
+   - The exported PDF must include all fields (name, IP, status, last time online, latency).
+   - The PDF must also include the same **header ("Sistemas Olivium")** and **footer** with dynamic year, just like the dashboard.
+   - Ensure the PDF styling matches the professional look of the dashboard.
+
+5. Backend optimization:
+   - Optimize the monitoring process for performance and scalability.
+   - Use **async or threading** so monitoring does not block the web interface.
+   - Ensure the system can handle dozens of machines efficiently without slowing down.
+
+6. Documentation (Important):
+   - Create a complete **README.md** file in **Portuguese (pt-BR)** only.
+   - The documentation must explain clearly:
+     - Installation steps
+     - Configuration (how to set up the machines.csv file, etc.)
+     - How to run the system
+     - Features included
+     - How to export to PDF
+     - Light/Dark mode usage
+   - The documentation must be easy to follow even for a non-technical user.
+
+7. Test everything before delivering:
+   - Machines should appear correctly on startup.
+   - Real-time monitoring must work smoothly and efficiently.
+   - Dashboard counters must match the actual machine statuses.
+   - PDF export must work correctly with the header and footer.
+   - Manual Light/Dark mode switching must work correctly.
+   - The header "Sistemas Olivium" must remain visible at the top even when scrolling.
+   - The footer must display correctly in both themes.
+
+Goal:
+Deliver a polished, modern, and professional-looking network monitoring dashboard 
+with optimized backend performance, a fixed header ("Sistemas Olivium"), 
+light/dark mode option, professional footer, PDF export with the same header and footer, 
+and complete documentation in Portuguese (README.md), fully functional and tested.
