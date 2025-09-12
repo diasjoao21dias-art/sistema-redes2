@@ -1,10 +1,10 @@
-modules = ["python-3.11"]
+modules = ["python-3.11", "python3"]
 [agent]
 expertMode = true
 
 [nix]
 channel = "stable-25_05"
-packages = ["freetype", "glibcLocales", "unzip"]
+packages = ["freetype", "glibcLocales", "libxcrypt", "unzip"]
 
 [workflows]
 runButton = "Project"
@@ -16,15 +16,31 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Sistema Monitor Rede"
+args = "Sistema Monitor Profissional"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Sistema Monitor Profissional v2.1"
 
 [[workflows.workflow]]
-name = "Sistema Monitor Rede"
+name = "Sistema Monitor Profissional"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python app.py"
+args = "python main.py"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow]]
+name = "Sistema Monitor Profissional v2.1"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python main.py"
 waitForPort = 5000
 
 [workflows.workflow.metadata]
@@ -33,3 +49,7 @@ outputType = "webview"
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 37021
+externalPort = 3000
