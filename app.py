@@ -217,8 +217,31 @@ def checar_um_host(host: dict):
             "status": new_status,
             "last_checked": now,
             "latency_ms": latency,
-            "reason": reason
+            "reason": reason,
+            "ip_changed": False  # Flag para indicar mudança de IP
         }
+        
+        # Detecta mudança de IP e atualiza automaticamente
+        if existing and existing.get("ip") and resolved_ip:
+            old_ip = existing.get("ip")
+            if old_ip != resolved_ip:
+                logger.info(f"IP ALTERADO para {hostname}: {old_ip} → {resolved_ip}")
+                data["ip_changed"] = True
+                
+                # Grava mudança no histórico como evento especial
+                try:
+                    with SessionLocal() as db:
+                        db.add(HostHistory(
+                            name=hostname, 
+                            ip=resolved_ip, 
+                            status=f"IP_CHANGED: {old_ip} → {resolved_ip}", 
+                            latency_ms=None, 
+                            timestamp=now
+                        ))
+                        db.commit()
+                        logger.info(f"Registrada mudança de IP para {hostname} no histórico")
+                except Exception as e:
+                    logger.error(f"Erro ao registrar mudança de IP para {hostname}: {e}")
         
         # Atualiza cache usando hostname como chave
         status_cache[hostname] = data
@@ -358,10 +381,12 @@ def status():
     for it in items:
         resp.append({
             "name": it["name"],
-            "ip": it["ip"],
+            "ip": it["ip"],  # IP atual resolvido automaticamente
             "status": it["status"],
             "time_last_checked": formatar_data_br(it["last_checked"]) if it["last_checked"] else None,
-            "latency_ms": it["latency_ms"]
+            "latency_ms": it["latency_ms"],
+            "reason": it.get("reason"),  # Motivo se offline (ex: DNS_FAIL)
+            "ip_changed": it.get("ip_changed", False)  # Flag de mudança de IP
         })
     return jsonify(resp)
 
@@ -423,12 +448,17 @@ def export_excel():
     # Create DataFrame
     data = []
     for item in items:
+        ip_display = item["ip"] if item["ip"] else "IP não resolvido"
+        if item.get("reason") == "DNS_FAIL":
+            ip_display = "Falha DNS"
+            
         data.append({
-            "Nome da Máquina": item["name"],
-            "Endereço IP": item["ip"],
+            "Nome da Máquina (Hostname)": item["name"],
+            "IP Atual": ip_display,
             "Status": item["status"],
             "Latência (ms)": item["latency_ms"] if item["latency_ms"] else "N/A",
-            "Última Verificação": formatar_data_br(item["last_checked"]) if item["last_checked"] else "Nunca"
+            "Última Verificação": formatar_data_br(item["last_checked"]) if item["last_checked"] else "Nunca",
+            "Observações": "IP alterado recentemente" if item.get("ip_changed") else ""
         })
     
     # Create Excel using simpler pandas approach

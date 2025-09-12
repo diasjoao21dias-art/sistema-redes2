@@ -333,7 +333,7 @@
     <section class="bg-white dark:bg-slate-800 rounded-2xl shadow-md overflow-hidden border border-gray-200 dark:border-slate-700">
       <div class="px-6 py-4 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-700/50">
         <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Máquinas da Rede</h3>
-        <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Monitoramento em tempo real de todos os dispositivos da rede</p>
+        <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Monitoramento por hostname com resolução automática de IP atual</p>
       </div>
       
       <div class="overflow-x-auto">
@@ -341,7 +341,7 @@
           <thead class="bg-gray-50 dark:bg-slate-700/50">
             <tr>
               <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Máquina</th>
-              <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Endereço IP</th>
+              <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">IP Atual</th>
               <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
               <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Latência</th>
               <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Última Verificação</th>
@@ -521,7 +521,19 @@
               </div>
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
-              <code class="text-sm text-gray-900 dark:text-gray-100 bg-gray-100 dark:bg-slate-700 px-2 py-1 rounded font-mono">${maquina.ip}</code>
+              <div class="flex items-center space-x-2">
+                <code class="text-sm text-gray-900 dark:text-gray-100 bg-gray-100 dark:bg-slate-700 px-2 py-1 rounded font-mono">
+                  ${maquina.ip || 'IP não resolvido'}
+                </code>
+                ${maquina.ip_changed ? 
+                  '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"><i class="fas fa-sync-alt mr-1"></i>IP Alterado</span>' : 
+                  ''
+                }
+                ${maquina.reason === 'DNS_FAIL' ? 
+                  '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"><i class="fas fa-exclamation-triangle mr-1"></i>Falha DNS</span>' : 
+                  ''
+                }
+              </div>
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
               <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${statusClass} ${statusBadgeClass}">
@@ -539,7 +551,7 @@
               ${maquina.time_last_checked || 'Nunca'}
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-              <button onclick="mostrarHistorico('${maquina.ip}', '${maquina.name}')" 
+              <button onclick="mostrarHistorico('${maquina.name}', '${maquina.ip || 'N/A'}')" 
                       class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors duration-200 font-medium">
                 <i class="fas fa-history mr-1"></i>Histórico
               </button>
@@ -585,12 +597,12 @@
     }
 
     // Mostrar histórico da máquina
-    async function mostrarHistorico(ip, nome) {
+    async function mostrarHistorico(hostname, ip) {
       try {
-        const response = await axios.get(`/history/${ip}`);
+        const response = await axios.get(`/history/name/${hostname}`);
         const historico = response.data;
         
-        document.getElementById('tituloModalHistorico').textContent = `${nome} (${ip}) - Histórico`;
+        document.getElementById('tituloModalHistorico').textContent = `${hostname} (${ip}) - Histórico`;
         
         let htmlHistorico = '';
         if (historico.length > 0) {
