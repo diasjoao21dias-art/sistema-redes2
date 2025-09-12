@@ -29,15 +29,15 @@ async def login(credentials: UserLogin, db: Session = Depends(get_db)):
             detail="Invalid username or password"
         )
     
-    roles = auth_service.get_user_roles(user.id)
-    token = auth_service.create_access_token(user.username, user.id, roles)
+    roles = auth_service.get_user_roles(user["id"])
+    token = auth_service.create_access_token(user["username"], user["id"], roles)
     
     user_response = UserResponse(
-        id=user.id,
-        username=user.username,
-        email=user.email,
-        full_name=user.full_name,
-        is_active=user.is_active,
+        id=user["id"],
+        username=user["username"],
+        email=user["email"],
+        full_name=user.get("full_name", ""),
+        is_active=user["is_active"],
         roles=roles
     )
     
@@ -81,6 +81,6 @@ async def setup_admin():
     admin = auth_service.setup_default_admin()
     return {
         "message": "Admin user created", 
-        "username": admin.username,
-        "api_key": admin.api_key
+        "username": admin["username"],
+        "api_key": admin["api_key"]
     }

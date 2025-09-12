@@ -42,7 +42,7 @@ class AuthService:
         except JWTError:
             return None
     
-    def authenticate_user(self, username: str, password: str) -> Tuple[Optional[User], bool]:
+    def authenticate_user(self, username: str, password: str) -> Tuple[Optional[dict], bool]:
         """Authenticate user credentials"""
         with SessionLocal() as db:
             user = db.query(User).filter(User.username == username).first()
@@ -55,11 +55,19 @@ class AuthService:
                 user.last_login = datetime.now(timezone.utc)
                 user.login_count = (user.login_count or 0) + 1
                 db.commit()
-                return user, True
+                
+                # Return dict to avoid session issues
+                user_dict = {
+                    'id': user.id,
+                    'username': user.username,
+                    'email': user.email,
+                    'is_active': user.is_active
+                }
+                return user_dict, True
                 
             return None, False
     
-    def authenticate_api_key(self, api_key: str) -> Optional[User]:
+    def authenticate_api_key(self, api_key: str) -> Optional[dict]:
         """Authenticate via API key"""
         with SessionLocal() as db:
             user = db.query(User).filter(
@@ -67,7 +75,14 @@ class AuthService:
                 User.api_key_active == True,
                 User.is_active == True
             ).first()
-            return user
+            if user:
+                return {
+                    'id': user.id,
+                    'username': user.username,
+                    'email': user.email,
+                    'is_active': user.is_active
+                }
+            return None
     
     def get_user_roles(self, user_id: int) -> list:
         """Get user roles"""
@@ -146,22 +161,46 @@ class AuthService:
     
     def setup_default_admin(self, username: str = "admin", 
                            password: str = "admin123", 
-                           email: str = "admin@sistemas-olivium.com"):
+                           email: str = "admin@sistemas-olivium.com") -> dict:
         """Setup default admin user"""
         self.setup_default_roles()
         
         with SessionLocal() as db:
             existing = db.query(User).filter(User.username == username).first()
-            if not existing:
-                admin = self.create_user(
-                    username=username,
-                    email=email,
-                    password=password,
-                    full_name="Administrator",
-                    role_name="admin"
-                )
-                admin.is_superuser = True
-                admin.generate_api_key()
-                db.commit()
-                return admin
-            return existing
+            if existing:
+                # Return dict to avoid session issues
+                return {
+                    'id': existing.id,
+                    'username': existing.username,
+                    'email': existing.email,
+                    'api_key': existing.api_key or 'no-api-key-generated'
+                }
+            
+            # Create new admin user
+            admin = User(
+                username=username,
+                email=email,
+                full_name="Administrator",
+                password_hash=self._hash_password(password),
+                is_active=True,
+                is_superuser=True,
+                api_key=secrets.token_urlsafe(32)
+            )
+            db.add(admin)
+            db.flush()  # Get ID
+            
+            # Add admin role
+            admin_role = db.query(Role).filter(Role.name == "admin").first()
+            if admin_role:
+                user_role = UserRole(user_id=admin.id, role_id=admin_role.id)
+                db.add(user_role)
+            
+            db.commit()
+            
+            # Return dict to avoid session issues
+            return {
+                'id': admin.id,
+                'username': admin.username,
+                'email': admin.email,
+                'api_key': admin.api_key
+            }
