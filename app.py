@@ -76,7 +76,7 @@ logger = logging.getLogger(__name__)
 # ----------------- Funções utilitárias -----------------
 
 def resolve_hostname(hostname, timeout=3):
-    """Resolve hostname para IP com cache TTL de 5 minutos"""
+    """Resolve hostname para IP com cache TTL de 5 minutos - thread-safe"""
     global dns_cache
     now = time.time()
     
@@ -91,10 +91,8 @@ def resolve_hostname(hostname, timeout=3):
                 return None, cache_entry["error"]
     
     try:
-        # Tenta resolver o hostname
-        socket.setdefaulttimeout(timeout)
+        # Resolução DNS sem modificar timeout global - thread-safe
         ip = socket.gethostbyname(hostname)
-        socket.setdefaulttimeout(None)
         
         # Armazena no cache
         dns_cache[hostname] = {
@@ -106,7 +104,7 @@ def resolve_hostname(hostname, timeout=3):
         
         return ip, None
         
-    except (socket.gaierror, socket.timeout, Exception) as e:
+    except (socket.gaierror, Exception) as e:
         error_msg = f"DNS resolution failed: {str(e)}"
         
         # Armazena erro no cache
@@ -157,7 +155,7 @@ def ping_icmp_target(target: str, retries=MAX_RETRIES):
                 return True, round(latency, 1)
         except (subprocess.TimeoutExpired, Exception) as e:
             if attempt == retries - 1:
-                logger.debug(f"Ping failed for {ip}: {e}")
+                logger.debug(f"Ping failed for {target}: {e}")
                 continue
     
     return False, None
@@ -679,7 +677,7 @@ def search():
     if query:
         items = [item for item in items if 
                 query in item["name"].lower() or 
-                query in item["ip"].lower()]
+                query in (item.get("ip") or "").lower()]
     
     if status_filter:
         items = [item for item in items if item["status"].lower() == status_filter.lower()]
