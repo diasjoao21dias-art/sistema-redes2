@@ -786,4 +786,4 @@ if __name__ == "__main__":
     logger.info("Sistema de monitoramento iniciado com sucesso!")
     
     # Run Flask server with host 0.0.0.0 for Replit compatibility
-    app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)
+    app.run(host="0.0.0.0", port=5001, debug=False, threaded=True)

@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistemas Olivium - Painel de Monitoramento de Rede</title>
+  <link href="{{ url_for('static', filename='css/tailwind.min.css') }}" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <script>
+    // Configure Tailwind to use custom dark mode
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            primary: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+              800: '#1e40af',
+              900: '#1e3a8a'
+            }
+          },
+          animation: {
+            'fade-in': 'fadeIn 0.5s ease-in-out',
+            'slide-up': 'slideUp 0.3s ease-out',
+            'pulse-success': 'pulseSuccess 2s infinite',
+            'pulse-danger': 'pulseDanger 2s infinite',
+            'status-change': 'statusChange 0.6s ease-in-out'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom CSS Variables for theming */
+    :root {
+      --bg-primary: #ffffff;
+      --bg-secondary: #f8fafc;
+      --bg-card: #ffffff;
+      --text-primary: #1f2937;
+      --text-secondary: #6b7280;
+      --border-color: #e5e7eb;
+      --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+
+    .dark {
+      --bg-primary: #0f172a;
+      --bg-secondary: #1e293b;
+      --bg-card: #334155;
+      --text-primary: #f1f5f9;
+      --text-secondary: #cbd5e1;
+      --border-color: #475569;
+      --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Custom animations */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    @keyframes pulseSuccess {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+      70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+    }
+
+    @keyframes pulseDanger {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+      70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+    }
+
+    @keyframes statusChange {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+
+    /* Smooth transitions */
+    * {
+      transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    /* Card hover effects */
+    .card-hover {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .card-hover:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-lg);
+    }
+
+    /* Status badges */
+    .status-online {
+      background: linear-gradient(135deg, #10b981, #059669);
+      animation: pulseSuccess 3s infinite;
+    }
+
+    .status-offline {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      animation: pulseDanger 3s infinite;
+    }
+
+    .status-unknown {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg-secondary);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border-color);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #9ca3af;
+    }
+
+    /* Loading animation */
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid var(--border-color);
+      border-top: 4px solid #3b82f6;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Glass morphism effect */
+    .glass {
+      backdrop-filter: blur(16px) saturate(180%);
+      background-color: rgba(255, 255, 255, 0.75);
+      border: 1px solid rgba(209, 213, 219, 0.3);
+    }
+
+    .dark .glass {
+      background-color: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(71, 85, 105, 0.3);
+    }
+  </style>
+</head>
+<body class="bg-gray-50 dark:bg-slate-900 min-h-screen transition-colors duration-300">
+  <!-- Fixed Header -->
+  <header class="bg-white dark:bg-slate-800 shadow-lg border-b border-gray-200 dark:border-slate-700 sticky top-0 z-50 transition-colors duration-300">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between items-center h-16">
+        <!-- Logo e Título -->
+        <div class="flex items-center space-x-4">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+              <i class="fas fa-network-wired text-white text-lg"></i>
+            </div>
+            <div>
+              <h1 class="text-xl font-bold text-gray-900 dark:text-white">Sistemas Olivium</h1>
+              <p class="text-xs text-gray-500 dark:text-gray-400">Monitoramento de Rede</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Controles do Header -->
+        <div class="flex items-center space-x-4">
+          <!-- Indicador de Status -->
+          <div class="hidden md:flex items-center space-x-2 px-3 py-1 bg-green-100 dark:bg-green-900/30 rounded-full">
+            <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <span class="text-sm text-green-700 dark:text-green-400 font-medium">Online</span>
+          </div>
+          
+          <!-- Toggle Dark Mode -->
+          <button onclick="toggleDarkMode()" 
+                  class="p-2 rounded-lg bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors duration-200"
+                  title="Alternar modo escuro">
+            <i class="fas fa-moon text-gray-600 dark:text-gray-300 dark:hidden"></i>
+            <i class="fas fa-sun text-yellow-400 hidden dark:block"></i>
+          </button>
+          
+          <!-- Botões de Exportação -->
+          <div class="flex space-x-2">
+            <button onclick="exportarDados('pdf')" 
+                    class="flex items-center space-x-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-200 text-sm font-medium shadow-md">
+              <i class="fas fa-file-pdf"></i>
+              <span class="hidden sm:block">PDF</span>
+            </button>
+            <button onclick="exportarDados('excel')" 
+                    class="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200 text-sm font-medium shadow-md">
+              <i class="fas fa-file-excel"></i>
+              <span class="hidden sm:block">Excel</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    
+    <!-- Estatísticas do Dashboard -->
+    <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in">
+      <!-- Total de Máquinas -->
+      <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-md hover:shadow-lg p-6 card-hover border border-gray-200 dark:border-slate-700">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Total de Máquinas</p>
+            <p class="text-3xl font-bold text-gray-900 dark:text-white mt-1" id="totalMaquinas">-</p>
+          </div>
+          <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+            <i class="fas fa-desktop text-white text-lg"></i>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Máquinas Online -->
+      <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-md hover:shadow-lg p-6 card-hover border border-gray-200 dark:border-slate-700">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Online</p>
+            <p class="text-3xl font-bold text-green-600 dark:text-green-400 mt-1" id="maquinasOnline">-</p>
+          </div>
+          <div class="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
+            <i class="fas fa-check-circle text-white text-lg"></i>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Máquinas Offline -->
+      <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-md hover:shadow-lg p-6 card-hover border border-gray-200 dark:border-slate-700">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Offline</p>
+            <p class="text-3xl font-bold text-red-600 dark:text-red-400 mt-1" id="maquinasOffline">-</p>
+          </div>
+          <div class="w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center">
+            <i class="fas fa-times-circle text-white text-lg"></i>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Latência Média -->
+      <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-md hover:shadow-lg p-6 card-hover border border-gray-200 dark:border-slate-700">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Latência Média</p>
+            <p class="text-3xl font-bold text-purple-600 dark:text-purple-400 mt-1">
+              <span id="latenciaMedia">-</span>
+              <span class="text-sm text-gray-500 dark:text-gray-400 ml-1">ms</span>
+            </p>
+          </div>
+          <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
+            <i class="fas fa-tachometer-alt text-white text-lg"></i>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Seção de Alertas -->
+    <section id="secaoAlertas" class="hidden animate-slide-up">
+      <div class="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-400 p-4 rounded-lg">
+        <div class="flex items-center">
+          <i class="fas fa-exclamation-triangle text-red-400 mr-3 text-lg"></i>
+          <div>
+            <p class="text-red-800 dark:text-red-200 font-medium">Alertas Críticos</p>
+            <p class="text-red-700 dark:text-red-300 text-sm mt-1" id="textoAlertas">Algumas máquinas estão offline há mais de 5 minutos</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pesquisa e Filtros -->
+    <section class="bg-white dark:bg-slate-800 rounded-2xl shadow-md p-6 border border-gray-200 dark:border-slate-700">
+      <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+        <!-- Pesquisa -->
+        <div class="flex-1">
+          <div class="relative">
+            <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500"></i>
+            <input type="text" 
+                   id="campoPesquisa" 
+                   placeholder="Pesquisar por nome ou endereço IP..." 
+                   class="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-slate-600 rounded-lg 
+                          focus:ring-2 focus:ring-blue-500 focus:border-blue-500 
+                          bg-white dark:bg-slate-700 text-gray-900 dark:text-white
+                          placeholder-gray-500 dark:placeholder-gray-400
+                          transition-colors duration-200">
+          </div>
+        </div>
+        
+        <!-- Filtro de Status -->
+        <div class="sm:w-48">
+          <select id="filtroStatus" 
+                  class="w-full px-4 py-3 border border-gray-300 dark:border-slate-600 rounded-lg 
+                         focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+                         bg-white dark:bg-slate-700 text-gray-900 dark:text-white
+                         transition-colors duration-200">
+            <option value="">Todos os Status</option>
+            <option value="online">Apenas Online</option>
+            <option value="offline">Apenas Offline</option>
+          </select>
+        </div>
+        
+        <!-- Limpar Filtros -->
+        <button onclick="limparFiltros()" 
+                class="px-4 py-3 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white 
+                       border border-gray-300 dark:border-slate-600 rounded-lg 
+                       hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors duration-200 font-medium">
+          <i class="fas fa-times mr-2"></i>Limpar
+        </button>
+      </div>
+    </section>
+
+    <!-- Tabela de Máquinas -->
+    <section class="bg-white dark:bg-slate-800 rounded-2xl shadow-md overflow-hidden border border-gray-200 dark:border-slate-700">
+      <div class="px-6 py-4 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-700/50">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Máquinas da Rede</h3>
+        <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Monitoramento híbrido: hostname primeiro, IP backup quando necessário</p>
+      </div>
+      
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+          <thead class="bg-gray-50 dark:bg-slate-700/50">
+            <tr>
+              <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Máquina</th>
+              <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">IP Atual</th>
+              <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+              <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Latência</th>
+              <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Última Verificação</th>
+              <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tabelaMaquinas" class="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
+            <!-- Linhas da tabela serão preenchidas pelo JavaScript -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Estado de Carregamento -->
+    <div id="estadoCarregamento" class="text-center py-16">
+      <div class="inline-flex flex-col items-center space-y-4">
+        <div class="loading-spinner"></div>
+        <span class="text-gray-600 dark:text-gray-400 font-medium">Carregando dados da rede...</span>
+      </div>
+    </div>
+  </main>
+
+  <!-- Professional Footer -->
+  <footer class="bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700 mt-16">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div class="text-center text-sm text-gray-600 dark:text-gray-400">
+        <p>&copy; <span id="currentYear"></span> Sistemas Olivium - Todos os direitos reservados</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Modal de Histórico -->
+  <div id="modalHistorico" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm hidden z-50 transition-opacity duration-300">
+    <div class="flex items-center justify-center min-h-screen px-4">
+      <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-4xl w-full max-h-96 overflow-hidden transform transition-transform duration-300 scale-95">
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-700/50 flex justify-between items-center">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white" id="tituloModalHistorico">Histórico da Máquina</h3>
+          <button onclick="fecharModalHistorico()" 
+                  class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-200">
+            <i class="fas fa-times text-xl"></i>
+          </button>
+        </div>
+        <div class="p-6 overflow-y-auto max-h-80">
+          <div id="conteudoHistorico">
+            <!-- Conteúdo do histórico será preenchido pelo JavaScript -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let dadosAtuais = [];
+    let pesquisaAtiva = false;
+    let statusAnterior = {};
+
+    // Dark mode functionality
+    function toggleDarkMode() {
+      const html = document.documentElement;
+      const isDark = html.classList.contains('dark');
+      
+      if (isDark) {
+        html.classList.remove('dark');
+        localStorage.setItem('darkMode', 'false');
+      } else {
+        html.classList.add('dark');
+        localStorage.setItem('darkMode', 'true');
+      }
+    }
+
+    // Initialize dark mode from localStorage
+    function initDarkMode() {
+      const darkMode = localStorage.getItem('darkMode');
+      if (darkMode === 'true' || (darkMode === null && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+      }
+    }
+
+    // Set current year in footer
+    function setCurrentYear() {
+      document.getElementById('currentYear').textContent = new Date().getFullYear();
+    }
+
+    // Buscar estatísticas do painel
+    async function buscarEstatisticas() {
+      try {
+        const response = await axios.get('/stats');
+        const stats = response.data;
+        
+        document.getElementById('totalMaquinas').textContent = stats.total_machines;
+        document.getElementById('maquinasOnline').textContent = stats.online;
+        document.getElementById('maquinasOffline').textContent = stats.offline;
+        document.getElementById('latenciaMedia').textContent = stats.avg_latency_ms;
+      } catch (error) {
+        console.error('Erro ao buscar estatísticas:', error);
+      }
+    }
+
+    // Buscar alertas
+    async function buscarAlertas() {
+      try {
+        const response = await axios.get('/alerts');
+        const alerts = response.data;
+        
+        const secaoAlertas = document.getElementById('secaoAlertas');
+        const textoAlertas = document.getElementById('textoAlertas');
+        
+        if (alerts.critical_alerts > 0) {
+          secaoAlertas.classList.remove('hidden');
+          textoAlertas.textContent = `${alerts.critical_alerts} máquina(s) estão offline há mais de 5 minutos`;
+        } else {
+          secaoAlertas.classList.add('hidden');
+        }
+      } catch (error) {
+        console.error('Erro ao buscar alertas:', error);
+      }
+    }
+
+    // Buscar dados das máquinas
+    async function buscarMaquinas(parametrosPesquisa = '') {
+      try {
+        let url = pesquisaAtiva ? '/search' + parametrosPesquisa : '/status';
+        const response = await axios.get(url);
+        dadosAtuais = response.data;
+        
+        renderizarTabelaMaquinas(dadosAtuais);
+        document.getElementById('estadoCarregamento').style.display = 'none';
+      } catch (error) {
+        console.error('Erro ao buscar máquinas:', error);
+      }
+    }
+
+    // Renderizar tabela de máquinas com animações
+    function renderizarTabelaMaquinas(maquinas) {
+      const tbody = document.getElementById('tabelaMaquinas');
+      tbody.innerHTML = '';
+
+      maquinas.forEach((maquina, index) => {
+        const isOnline = maquina.status === 'Online';
+        const isOffline = maquina.status === 'Offline';
+        const isUnknown = maquina.status === 'Desconhecido';
+        
+        let statusClass, statusIcon, statusBadgeClass;
+        
+        if (isOnline) {
+          statusClass = 'status-online';
+          statusIcon = 'fa-check-circle';
+          statusBadgeClass = 'text-white';
+        } else if (isOffline) {
+          statusClass = 'status-offline';
+          statusIcon = 'fa-times-circle';
+          statusBadgeClass = 'text-white';
+        } else {
+          statusClass = 'status-unknown';
+          statusIcon = 'fa-question-circle';
+          statusBadgeClass = 'text-white';
+        }
+
+        // Check for status change animation
+        const previousStatus = statusAnterior[maquina.ip];
+        const hasStatusChanged = previousStatus && previousStatus !== maquina.status;
+        statusAnterior[maquina.ip] = maquina.status;
+        
+        const linha = `
+          <tr class="hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors duration-200 ${hasStatusChanged ? 'animate-status-change' : ''}" 
+              style="animation-delay: ${index * 50}ms">
+            <td class="px-6 py-4 whitespace-nowrap">
+              <div class="flex items-center">
+                <div class="flex-shrink-0 w-10 h-10">
+                  <div class="w-10 h-10 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-slate-600 dark:to-slate-700 flex items-center justify-center">
+                    <i class="fas fa-desktop text-gray-600 dark:text-gray-300"></i>
+                  </div>
+                </div>
+                <div class="ml-4">
+                  <div class="text-sm font-medium text-gray-900 dark:text-white">${maquina.name}</div>
+                </div>
+              </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <div class="flex items-center space-x-2">
+                <code class="text-sm text-gray-900 dark:text-gray-100 bg-gray-100 dark:bg-slate-700 px-2 py-1 rounded font-mono">
+                  ${maquina.ip || 'IP não resolvido'}
+                </code>
+                ${maquina.ip_changed ? 
+                  '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"><i class="fas fa-sync-alt mr-1"></i>IP Alterado</span>' : 
+                  ''
+                }
+                ${maquina.reason === 'DNS_FAIL_FALLBACK' ? 
+                  '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200"><i class="fas fa-shield-alt mr-1"></i>IP Backup</span>' : 
+                  ''
+                }
+                ${maquina.reason === 'DNS_FAIL_NO_BACKUP' ? 
+                  '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"><i class="fas fa-exclamation-triangle mr-1"></i>Falha Total</span>' : 
+                  ''
+                }
+                ${maquina.method === 'HOSTNAME' ? 
+                  '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"><i class="fas fa-check mr-1"></i>DNS OK</span>' : 
+                  ''
+                }
+              </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${statusClass} ${statusBadgeClass}">
+                <i class="fas ${statusIcon} mr-1"></i>
+                ${maquina.status}
+              </span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm">
+              ${maquina.latency_ms ? 
+                `<span class="text-gray-900 dark:text-gray-100 font-medium">${maquina.latency_ms}ms</span>` : 
+                '<span class="text-gray-500 dark:text-gray-400">N/A</span>'
+              }
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+              ${maquina.time_last_checked || 'Nunca'}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+              <button onclick="mostrarHistorico('${maquina.name}', '${maquina.ip || 'N/A'}')" 
+                      class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors duration-200 font-medium">
+                <i class="fas fa-history mr-1"></i>Histórico
+              </button>
+            </td>
+          </tr>
+        `;
+        tbody.innerHTML += linha;
+      });
+    }
+
+    // Funcionalidade de pesquisa
+    function realizarPesquisa() {
+      const consultaPesquisa = document.getElementById('campoPesquisa').value;
+      const filtroStatus = document.getElementById('filtroStatus').value;
+      
+      if (consultaPesquisa || filtroStatus) {
+        pesquisaAtiva = true;
+        let params = '?';
+        if (consultaPesquisa) params += `q=${encodeURIComponent(consultaPesquisa)}&`;
+        if (filtroStatus) params += `status=${filtroStatus}&`;
+        buscarMaquinas(params);
+      } else {
+        pesquisaAtiva = false;
+        buscarMaquinas();
+      }
+    }
+
+    // Limpar filtros
+    function limparFiltros() {
+      document.getElementById('campoPesquisa').value = '';
+      document.getElementById('filtroStatus').value = '';
+      pesquisaAtiva = false;
+      buscarMaquinas();
+    }
+
+    // Exportar dados
+    function exportarDados(formato) {
+      if (formato === 'pdf') {
+        window.open('/export/pdf', '_blank');
+      } else if (formato === 'excel') {
+        window.open('/export/excel', '_blank');
+      }
+    }
+
+    // Mostrar histórico da máquina
+    async function mostrarHistorico(hostname, ip) {
+      try {
+        const response = await axios.get(`/history/name/${hostname}`);
+        const historico = response.data;
+        
+        document.getElementById('tituloModalHistorico').textContent = `${hostname} (${ip}) - Histórico`;
+        
+        let htmlHistorico = '';
+        if (historico.length > 0) {
+          htmlHistorico = `
+            <div class="space-y-3">
+              ${historico.map(entrada => `
+                <div class="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-700 rounded-lg border border-gray-200 dark:border-slate-600">
+                  <div class="flex items-center space-x-3">
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                      entrada.status === 'Online' ? 
+                      'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 
+                      'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                    }">
+                      <i class="fas ${entrada.status === 'Online' ? 'fa-check-circle' : 'fa-times-circle'} mr-1"></i>
+                      ${entrada.status}
+                    </span>
+                    <span class="text-sm text-gray-600 dark:text-gray-400 font-medium">${entrada.time}</span>
+                  </div>
+                  <span class="text-sm text-gray-500 dark:text-gray-400">
+                    ${entrada.latency_ms ? entrada.latency_ms + 'ms' : 'N/A'}
+                  </span>
+                </div>
+              `).join('')}
+            </div>
+          `;
+        } else {
+          htmlHistorico = '<p class="text-gray-500 dark:text-gray-400 text-center py-8">Nenhum histórico disponível para esta máquina.</p>';
+        }
+        
+        document.getElementById('conteudoHistorico').innerHTML = htmlHistorico;
+        const modal = document.getElementById('modalHistorico');
+        modal.classList.remove('hidden');
+        modal.querySelector('.transform').classList.remove('scale-95');
+        modal.querySelector('.transform').classList.add('scale-100');
+      } catch (error) {
+        console.error('Erro ao buscar histórico:', error);
+      }
+    }
+
+    // Fechar modal de histórico
+    function fecharModalHistorico() {
+      const modal = document.getElementById('modalHistorico');
+      modal.querySelector('.transform').classList.remove('scale-100');
+      modal.querySelector('.transform').classList.add('scale-95');
+      setTimeout(() => {
+        modal.classList.add('hidden');
+      }, 300);
+    }
+
+    // Event listeners
+    document.getElementById('campoPesquisa').addEventListener('keyup', function(e) {
+      if (e.key === 'Enter') {
+        realizarPesquisa();
+      }
+      // Pesquisa com debounce
+      clearTimeout(this.timeoutPesquisa);
+      this.timeoutPesquisa = setTimeout(realizarPesquisa, 500);
+    });
+
+    document.getElementById('filtroStatus').addEventListener('change', realizarPesquisa);
+
+    // Clique fora do modal para fechar
+    document.getElementById('modalHistorico').addEventListener('click', function(e) {
+      if (e.target === this) {
+        fecharModalHistorico();
+      }
+    });
+
+    // Inicializar painel
+    async function inicializarPainel() {
+      await Promise.all([buscarEstatisticas(), buscarAlertas(), buscarMaquinas()]);
+    }
+
+    // Atualização automática a cada 5 segundos
+    setInterval(async () => {
+      if (!document.getElementById('modalHistorico').classList.contains('hidden')) {
+        return; // Não atualiza enquanto o modal está aberto
+      }
+      await Promise.all([buscarEstatisticas(), buscarAlertas(), buscarMaquinas()]);
+    }, 5000);
+
+    // Initialize everything when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+      initDarkMode();
+      setCurrentYear();
+      inicializarPainel();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+Please review, upgrade, and optimize the entire system to make it fully modern, professional, and optimized — both in design (visual) and functionality (monitoring).  
+
+Important: Do a full evaluation of the system and identify improvements that can be implemented to make it more modern, professional, and useful for real network monitoring activities. Apply those improvements directly.
+
+Requirements:
+1. Core functionality (must keep working):
+   - Machines must load automatically from machines.csv
+   - Real-time monitoring of online/offline status
+   - Display "Last Time Online" for offline machines
+   - Summary counters (total, online, offline, average latency)
+   - Export to PDF instead of CSV
+
+2. Dashboard design (visual modernization):
+   - Make the interface as modern and professional as possible.
+   - Clean UI with professional typography, modern layout, and responsive design.
+   - Clear visual indicators for machine status (colors, icons, badges).
+   - Subtle animations for status updates.
+   - Manual **light/dark mode** switch.
+   - Sticky header with the title **"Sistemas Olivium"**.
+   - Professional footer with dynamic year and:
+     "© <year> Sistemas Olivium - Todos os direitos reservados".
+   - Header and footer must adapt to both light and dark modes.
+
+3. Monitoring optimization (functional improvements):
+   - Optimize backend for performance and scalability (use async/threading).
+   - Ensure efficient monitoring even with dozens of machines.
+   - Improve detection accuracy and reliability.
+   - Optimize refresh/data handling for real-time performance.
+
+4. New features and improvements (evaluation required):
+   - Analyze the system and implement extra features that make sense for real professional monitoring.  
+     Examples (only if useful):
+       - Average response time / latency display
+       - Uptime history tracking
+       - Alerts if a machine stays offline too long
+       - Filters or search bar in the dashboard
+       - Export options for logs or history
+   - You decide the best enhancements, based on what will make the system more modern and practical.
+
+5. PDF Export:
+   - Export all fields (name, IP, status, last time online, latency, etc.).
+   - Include the same **header ("Sistemas Olivium")** and **footer** from the dashboard.
+   - Style must match the modern design of the dashboard.
+
+6. Documentation:
+   - Provide a complete **README.md** in Portuguese (pt-BR) only.
+   - Explain installation, configuration, usage, features, PDF export, light/dark mode.
+   - If you add new features, include them in the documentation.
+   - Keep it clear for non-technical users.
+
+7. Testing:
+   - Ensure all machines appear on startup.
+   - Verify monitoring is stable, accurate, and efficient.
+   - Dashboard counters must match actual machine statuses.
+   - PDF export must include header/footer.
+   - Light/Dark mode must work.
+   - Header and footer must render correctly.
+   - Test all new improvements you implement.
+
+Goal:
+Deliver a **fully modern, professional, and optimized network monitoring dashboard**, improving both **design** and **monitoring functionality**, and adding any useful new features you identify, keeping everything in Portuguese (pt-BR), fully tested and ready for production.

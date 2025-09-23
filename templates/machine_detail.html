@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ machine_name }} - Sistemas Olivium</title>
+  <link href="{{ url_for('static', filename='css/tailwind.min.css') }}" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            primary: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+              800: '#1e40af',
+              900: '#1e3a8a'
+            }
+          },
+          animation: {
+            'fade-in': 'fadeIn 0.5s ease-in-out',
+            'slide-up': 'slideUp 0.3s ease-out',
+            'pulse-success': 'pulseSuccess 2s infinite',
+            'pulse-danger': 'pulseDanger 2s infinite',
+            'bounce-slow': 'bounce 2s infinite'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    :root {
+      --bg-primary: #ffffff;
+      --bg-secondary: #f8fafc;
+      --bg-card: #ffffff;
+      --text-primary: #1f2937;
+      --text-secondary: #6b7280;
+      --border-color: #e5e7eb;
+      --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+
+    .dark {
+      --bg-primary: #0f172a;
+      --bg-secondary: #1e293b;
+      --bg-card: #334155;
+      --text-primary: #f1f5f9;
+      --text-secondary: #cbd5e1;
+      --border-color: #475569;
+      --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    @keyframes pulseSuccess {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+      70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+    }
+
+    @keyframes pulseDanger {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+      70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+    }
+
+    * {
+      transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .card-hover {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .card-hover:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .status-online {
+      background: linear-gradient(135deg, #10b981, #059669);
+      animation: pulseSuccess 3s infinite;
+    }
+
+    .status-offline {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      animation: pulseDanger 3s infinite;
+    }
+
+    .status-unknown {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+    }
+
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid var(--border-color);
+      border-top: 4px solid #3b82f6;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body class="bg-gray-50 dark:bg-slate-900 min-h-screen transition-colors duration-300">
+  <!-- Fixed Header -->
+  <header class="bg-white dark:bg-slate-800 shadow-lg border-b border-gray-200 dark:border-slate-700 sticky top-0 z-50 transition-colors duration-300">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between items-center h-16">
+        <!-- Logo e Navegação -->
+        <div class="flex items-center space-x-4">
+          <a href="/" class="flex items-center space-x-3 hover:opacity-80 transition-opacity duration-200">
+            <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+              <i class="fas fa-network-wired text-white text-lg"></i>
+            </div>
+            <div>
+              <h1 class="text-xl font-bold text-gray-900 dark:text-white">Sistemas Olivium</h1>
+              <p class="text-xs text-gray-500 dark:text-gray-400">Monitoramento Individual</p>
+            </div>
+          </a>
+        </div>
+        
+        <!-- Controles do Header -->
+        <div class="flex items-center space-x-4">
+          <!-- Botão Voltar -->
+          <a href="/" 
+             class="flex items-center space-x-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors duration-200 text-sm font-medium shadow-md">
+            <i class="fas fa-arrow-left"></i>
+            <span>Voltar ao Dashboard</span>
+          </a>
+          
+          <!-- Toggle Dark Mode -->
+          <button onclick="toggleDarkMode()" 
+                  class="p-2 rounded-lg bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors duration-200"
+                  title="Alternar modo escuro">
+            <i class="fas fa-moon text-gray-600 dark:text-gray-300 dark:hidden"></i>
+            <i class="fas fa-sun text-yellow-400 hidden dark:block"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    
+    <!-- Cabeçalho da Máquina -->
+    <section class="bg-white dark:bg-slate-800 rounded-2xl shadow-md p-8 border border-gray-200 dark:border-slate-700 animate-fade-in">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+        <div class="flex items-center space-x-4">
+          <div class="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center">
+            <i class="fas fa-desktop text-white text-2xl"></i>
+          </div>
+          <div>
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-white" id="machineName">{{ machine_name }}</h1>
+            <p class="text-gray-600 dark:text-gray-400 text-lg mt-1">Monitoramento em Tempo Real</p>
+          </div>
+        </div>
+        
+        <!-- Status Principal -->
+        <div class="flex flex-col items-end space-y-2">
+          <div id="statusPrincipal" class="inline-flex items-center px-6 py-3 rounded-full text-lg font-semibold">
+            <i id="statusIcon" class="fas fa-question-circle mr-2"></i>
+            <span id="statusText">Carregando...</span>
+          </div>
+          <div class="text-sm text-gray-500 dark:text-gray-400" id="lastUpdate">
+            Última verificação: --
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Informações da Máquina -->
+    <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-slide-up">
+      <!-- IP Atual -->
+      <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-md hover:shadow-lg p-6 card-hover border border-gray-200 dark:border-slate-700">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Endereço IP</p>
+            <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1" id="machineIP">--</p>
+          </div>
+          <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+            <i class="fas fa-network-wired text-white text-lg"></i>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Latência -->
+      <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-md hover:shadow-lg p-6 card-hover border border-gray-200 dark:border-slate-700">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Latência</p>
+            <p class="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-1">
+              <span id="machineLatency">--</span>
+              <span class="text-sm text-gray-500 dark:text-gray-400 ml-1">ms</span>
+            </p>
+          </div>
+          <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
+            <i class="fas fa-tachometer-alt text-white text-lg"></i>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Método de Conexão -->
+      <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-md hover:shadow-lg p-6 card-hover border border-gray-200 dark:border-slate-700">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Método</p>
+            <p class="text-lg font-bold text-orange-600 dark:text-orange-400 mt-1" id="machineMethod">--</p>
+          </div>
+          <div class="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
+            <i class="fas fa-cogs text-white text-lg"></i>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Status de Conexão -->
+      <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-md hover:shadow-lg p-6 card-hover border border-gray-200 dark:border-slate-700">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Conectividade</p>
+            <p class="text-lg font-bold text-green-600 dark:text-green-400 mt-1" id="machineReason">--</p>
+          </div>
+          <div class="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
+            <i class="fas fa-wifi text-white text-lg"></i>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Histórico da Máquina -->
+    <section class="bg-white dark:bg-slate-800 rounded-2xl shadow-md border border-gray-200 dark:border-slate-700">
+      <div class="px-6 py-4 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-700/50">
+        <div class="flex justify-between items-center">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Histórico de Status</h3>
+          <button onclick="refreshHistory()" 
+                  class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors duration-200 font-medium">
+            <i class="fas fa-sync-alt mr-1"></i>Atualizar
+          </button>
+        </div>
+      </div>
+      
+      <div class="p-6">
+        <div id="machineHistory" class="space-y-3">
+          <div class="text-center py-8">
+            <div class="loading-spinner mx-auto mb-4"></div>
+            <span class="text-gray-600 dark:text-gray-400 font-medium">Carregando histórico...</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Professional Footer -->
+  <footer class="bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700 mt-16">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div class="text-center text-sm text-gray-600 dark:text-gray-400">
+        <p>&copy; <span id="currentYear"></span> Sistemas Olivium - Todos os direitos reservados</p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const machineName = "{{ machine_name }}";
+    let updateInterval;
+
+    // Dark mode functionality
+    function toggleDarkMode() {
+      const html = document.documentElement;
+      const isDark = html.classList.contains('dark');
+      
+      if (isDark) {
+        html.classList.remove('dark');
+        localStorage.setItem('darkMode', 'false');
+      } else {
+        html.classList.add('dark');
+        localStorage.setItem('darkMode', 'true');
+      }
+    }
+
+    // Initialize dark mode from localStorage
+    function initDarkMode() {
+      const darkMode = localStorage.getItem('darkMode');
+      if (darkMode === 'true' || (darkMode === null && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+      }
+    }
+
+    // Set current year in footer
+    function setCurrentYear() {
+      document.getElementById('currentYear').textContent = new Date().getFullYear();
+    }
+
+    // Buscar dados da máquina
+    async function fetchMachineData() {
+      try {
+        const response = await axios.get(`/api/machine/${encodeURIComponent(machineName)}`);
+        const machine = response.data;
+        
+        updateMachineDisplay(machine);
+      } catch (error) {
+        console.error('Erro ao buscar dados da máquina:', error);
+        showError('Erro ao carregar dados da máquina');
+      }
+    }
+
+    // Atualizar exibição da máquina
+    function updateMachineDisplay(machine) {
+      // Status principal
+      const statusElement = document.getElementById('statusPrincipal');
+      const statusIcon = document.getElementById('statusIcon');
+      const statusText = document.getElementById('statusText');
+      
+      let statusClass, iconClass;
+      
+      if (machine.status === 'Online') {
+        statusClass = 'status-online text-white';
+        iconClass = 'fa-check-circle';
+      } else if (machine.status === 'Offline') {
+        statusClass = 'status-offline text-white';
+        iconClass = 'fa-times-circle';
+      } else {
+        statusClass = 'status-unknown text-white';
+        iconClass = 'fa-question-circle';
+      }
+      
+      statusElement.className = `inline-flex items-center px-6 py-3 rounded-full text-lg font-semibold ${statusClass}`;
+      statusIcon.className = `fas ${iconClass} mr-2`;
+      statusText.textContent = machine.status;
+      
+      // Informações detalhadas
+      document.getElementById('machineIP').textContent = machine.ip || 'IP não resolvido';
+      document.getElementById('machineLatency').textContent = machine.latency_ms || '--';
+      document.getElementById('machineMethod').textContent = machine.method || '--';
+      document.getElementById('machineReason').textContent = getReasonDisplay(machine.reason);
+      document.getElementById('lastUpdate').textContent = `Última verificação: ${machine.time_last_checked || 'Nunca'}`;
+    }
+
+    // Converter reason para display amigável
+    function getReasonDisplay(reason) {
+      switch(reason) {
+        case 'DNS_FAIL_FALLBACK': return 'IP Backup';
+        case 'DNS_FAIL_NO_BACKUP': return 'Falha Total';
+        case 'HOSTNAME': return 'DNS OK';
+        default: return reason || '--';
+      }
+    }
+
+    // Buscar histórico da máquina
+    async function fetchMachineHistory() {
+      try {
+        const response = await axios.get(`/api/machine/${encodeURIComponent(machineName)}/history`);
+        const history = response.data;
+        
+        updateHistoryDisplay(history);
+      } catch (error) {
+        console.error('Erro ao buscar histórico:', error);
+        document.getElementById('machineHistory').innerHTML = 
+          '<p class="text-gray-500 dark:text-gray-400 text-center py-8">Erro ao carregar histórico.</p>';
+      }
+    }
+
+    // Atualizar exibição do histórico
+    function updateHistoryDisplay(history) {
+      const historyContainer = document.getElementById('machineHistory');
+      
+      if (history.length === 0) {
+        historyContainer.innerHTML = 
+          '<p class="text-gray-500 dark:text-gray-400 text-center py-8">Nenhum histórico disponível para esta máquina.</p>';
+        return;
+      }
+      
+      let htmlHistory = '';
+      history.forEach((entry, index) => {
+        const isOnline = entry.status === 'Online';
+        const statusClass = isOnline 
+          ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+          : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+        const statusIcon = isOnline ? 'fa-check-circle' : 'fa-times-circle';
+        
+        htmlHistory += `
+          <div class="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-700 rounded-lg border border-gray-200 dark:border-slate-600 animate-fade-in" 
+               style="animation-delay: ${index * 50}ms">
+            <div class="flex items-center space-x-3">
+              <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${statusClass}">
+                <i class="fas ${statusIcon} mr-1"></i>
+                ${entry.status}
+              </span>
+              <span class="text-sm text-gray-600 dark:text-gray-400 font-medium">${entry.time}</span>
+              ${entry.ip ? `<code class="text-xs text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-slate-600 px-2 py-1 rounded">${entry.ip}</code>` : ''}
+            </div>
+            <span class="text-sm text-gray-500 dark:text-gray-400">
+              ${entry.latency_ms ? entry.latency_ms + 'ms' : 'N/A'}
+            </span>
+          </div>
+        `;
+      });
+      
+      historyContainer.innerHTML = htmlHistory;
+    }
+
+    // Atualizar histórico manualmente
+    function refreshHistory() {
+      fetchMachineHistory();
+    }
+
+    // Mostrar erro
+    function showError(message) {
+      const statusElement = document.getElementById('statusPrincipal');
+      statusElement.className = 'inline-flex items-center px-6 py-3 rounded-full text-lg font-semibold bg-red-500 text-white';
+      document.getElementById('statusIcon').className = 'fas fa-exclamation-triangle mr-2';
+      document.getElementById('statusText').textContent = 'Erro';
+    }
+
+    // Inicializar dados
+    async function initializePage() {
+      await Promise.all([fetchMachineData(), fetchMachineHistory()]);
+    }
+
+    // Atualização automática a cada 5 segundos
+    function startAutoUpdate() {
+      updateInterval = setInterval(async () => {
+        await fetchMachineData();
+      }, 5000);
+    }
+
+    function stopAutoUpdate() {
+      if (updateInterval) {
+        clearInterval(updateInterval);
+      }
+    }
+
+    // Initialize everything when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+      initDarkMode();
+      setCurrentYear();
+      initializePage();
+      startAutoUpdate();
+    });
+
+    // Cleanup when page is unloaded
+    window.addEventListener('beforeunload', function() {
+      stopAutoUpdate();
+    });
+  </script>
+</body>
+</html>
